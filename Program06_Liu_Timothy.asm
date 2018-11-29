@@ -1,7 +1,7 @@
 TITLE Low-level I/O Procedures     (Program06_Liu_Timothy.asm)
 
 ; Author: Timothy Liu
-; Last Modified: November 27, 2018
+; Last Modified: November 28, 2018
 ; OSU email address: liutim@oregonstate.edu
 ; Course number/section: CS_271_400_F2018
 ; Project Number: 06               Due Date: December 2, 2018
@@ -17,28 +17,33 @@ TITLE Low-level I/O Procedures     (Program06_Liu_Timothy.asm)
 INCLUDE Irvine32.inc
 
 ; Description: Macro to get a string from the user
-; Receives: 
-; Returns: 
-; Preconditions: 
-; Registers changed: 
+; Receives: Address of prompt and address of string variable
+; Returns: String variable with user's input
+; Preconditions: none
+; Registers changed: eax, ecx, edx
 getString MACRO prompt, input
+	mov		eax, 0
 	mov		edx, prompt
 	call	WriteString
 	mov		edx, input
-	mov		ecx, STRING_SIZE
+	mov		ecx, SIZE_CATCH
+	dec		ecx
 	call	ReadString
 ENDM
 
 ; Description: Macro to display a string
-; Receives: 
-; Returns: 
-; Preconditions: 
-; Registers changed: 
-displayString MACRO
+; Receives: @ string to be displayed
+; Returns: none
+; Preconditions: none
+; Registers changed: edx
+displayString MACRO str
+	mov		edx, str
+	call	WriteString
 ENDM
 
 NUM_VALUES = 10
 STRING_SIZE = 11
+SIZE_CATCH = 99
 
 .data
 intro_1			BYTE	"Low-level I/O Procedures by Timothy Liu", 0dh, 0ah, 0dh, 0ah, 0
@@ -48,14 +53,20 @@ intro_3			BYTE	"Each number needs to be small enough to fit inside "
 				BYTE	"finished inputting the numbers I will display a list "
 				BYTE	"of the integers, the sum, and the average.", 0dh, 0ah, 0dh, 0ah, 0
 promptText		BYTE	"Please enter an unsigned number: ", 0
-userString		BYTE	STRING_SIZE DUP(0)											; Holds input as a string (up to 10 digits)
+userString		BYTE	SIZE_CATCH DUP(0)											; Holds input as a string (up to 10 digits)
 stringLength	DWORD	?															; Holds length of user input
-temp			BYTE	0															; Helps with conversion from char to numeric value
+tempVar			BYTE	0															; Helps with conversion from char to numeric value
+tempDword		DWORD	0															; Helps with conversion from numeric to char
 userVal			DWORD	?															; Holds input as a numeric value
 invalidFlag		DWORD	?															; 0 if input is only numbers, 1 otherwise
 array			DWORD	NUM_VALUES DUP(?)											; Stores valid user inputs
-goodString		BYTE	"Good input", 0
-badString		BYTE	"Bad input", 0
+errorText		BYTE	"ERROR: You did not enter an unsigned number or your "
+				BYTE	"number was too big.", 0dh, 0ah, 0
+tempString		BYTE	STRING_SIZE DUP(0)											; Holds string converted from numeric value to be displayed
+arrayText		BYTE	"You entered the following valid numbers:", 0dh, 0ah, 0
+comma			BYTE	", ", 0
+sumText			BYTE	"The sum of these numbers is: ", 0						
+avgText			BYTE	"The average is: ", 0
 .code
 main PROC
 
@@ -65,11 +76,41 @@ main PROC
 	push	OFFSET intro_3
 	call	introduction
 
+; Prompt user for inputs to fill array
+	push	OFFSET errorText
+	push	OFFSET array
+	push	OFFSET promptText
+	push	OFFSET userString
+	push	OFFSET stringLength
+	push	OFFSET tempVar
+	push	OFFSET userVal
+	push	OFFSET invalidFlag
+	call	FillArray
+
+; Display integers stored in array
+	push	OFFSET arrayText
+	push	OFFSET comma
+	push	OFFSET array
+	push	OFFSET tempString
+	push	OFFSET tempDword
+	push	OFFSET userString
+	call	ShowArray
+
+; Calculate and display sum and average
+	push	OFFSET avgText
+	push	OFFSET sumText
+	push	OFFSET array
+	push	OFFSET tempString
+	push	OFFSET tempDword
+	push	OFFSET userString
+	call	ShowSumAvg
+	
+COMMENT !
 ; Prompt the user for input
 	push	OFFSET promptText
 	push	OFFSET userString
 	push	OFFSET stringLength
-	push	OFFSET temp
+	push	OFFSET tempVar
 	push	OFFSET userVal
 	push	OFFSET invalidFlag
 	call	ReadVal
@@ -78,14 +119,23 @@ main PROC
 	je		badInput
 	mov		edx, OFFSET goodString
 	call	WriteString
+	call	Crlf
 	mov		eax, userVal
 	call	WriteDec
+	call	Crlf
+; WriteVal PROC
+	push	eax
+	push	OFFSET tempString
+	push	OFFSET tempDword
+	push	OFFSET userString
+	call	WriteVal
 	jmp		goodInput
+
 badInput:
 	mov		edx, OFFSET badString
 	call	WriteString
 goodInput:
-
+!
 ; Display valid inputs
 ; Display sum of inputs
 ; Display average of inputs
@@ -125,10 +175,10 @@ introduction	PROC
 introduction	ENDP
 
 ; Description: Procedure to get a value from the user
-; Receives: 
-; Returns: 
-; Preconditions: 
-; Registers changed: 
+; Receives: @ prompt, @ userString variable, @ string length, @ tempVar, @ userVal variable, @ invalidFlag
+; Returns: userVal with the user's string converted to numeric value and invalidFlag with status of result
+; Preconditions: none
+; Registers changed: none
 
 ReadVal		PROC
 ; Set up stack frame
@@ -138,6 +188,10 @@ ReadVal		PROC
 
 ; Get string from user
 	getString	[ebp+60], [ebp+56]
+
+; Check if user input was more than 10 digits
+	cmp			eax, STRING_SIZE
+	je			notNum
 
 ; Set up conversion from char to int
 	mov			edx, [ebp+52]			; Access address of string length variable
@@ -149,19 +203,24 @@ ReadVal		PROC
 	cld									; Read string in forward direction
 counter:
 	lodsb
-	cmp			al, 48
-	jl			notNum
-	cmp			al, 57
+	cmp			al, 48					; Check lower range of value
+	jl			notNum				
+	cmp			al, 57					; Check upper range of value
 	jg			notNum
-	sub			al, 48
+	sub			al, 48					; Convert to int value
 	stosb
 	loop		counter
+
+; Set up conversion to numeric value
 	push		[ebp+56]	; Pass user input by reference
 	push		[edx]		; Pass length of input
-	push		[ebp+48]	; Pass temp value by reference
+	push		[ebp+48]	; Pass tempVar value by reference
 	push		[ebp+44]	; Pass variable to hold user's numeric value by reference
-	push		[ebx]		; Pass status flag
+	push		ebx			; Pass status flag by reference
 	call		charToNum
+	mov			eax, 1
+	cmp			[ebx], eax
+	je			invalidInput
 	jmp			validInput
 
 notNum:
@@ -180,6 +239,12 @@ invalidInput:
 	ret			24
 ReadVal		ENDP
 
+; Description: Sub-procedure to convert user's string to numeric value
+; Receives: @ userString variable, string length, @ tempVar, @ userVal variable, @ invalidFlag
+; Returns: userVal with the user's string converted to numeric value and invalidFlag with status of result
+; Preconditions: none
+; Registers changed: none
+
 charToNum	PROC
 ; Set up stack frame
 	pushad
@@ -187,26 +252,237 @@ charToNum	PROC
 	mov		ebp, esp
 
 ; Set up conversion
-	mov		ecx, [ebp+52]	; Set up counter
-	mov		esi, [ebp+56]	; Start of string
+	mov		ecx, [ebp+52]			; Set up counter
+	mov		esi, [ebp+56]			; Start of string
 	mov		edx, 0
-	mov		edi, [ebp+48]	; Access temp variable
-	mov		ebx, 0
+	mov		edi, [ebp+48]			; Access tempVar
+	mov		ebx, 0					; Set up initial value
 counter:
 	lodsb
-	mov		[edi], al
-	mov		eax, 10
-	mul		ebx
+	mov		[edi], al				; Store each byte in tempVar
+	mov		eax, 10					; Set up multiplicand
+	mul		ebx						; Perform multiplication
+	cmp		edx, 0					; Check if number exceeds 32-bit register
+	jne		bigNum
 	mov		ebx, eax
-	add		ebx, DWORD PTR [edi]
+	add		ebx, DWORD PTR [edi]	; Add value of next byte
+	jc		bigNum					; Check if addition exceeds 32-bit register
 	loop	counter
+; Store final value in userVal variable
 	mov		eax, [ebp+44]
 	mov		[eax], ebx
-	
+
+; Set status of invalidFlag to 0 to indicate valid input
+	mov		ebx, [ebp+40]
+	mov		eax, 0
+	mov		[ebx], eax
+	jmp		noCarry
+
+; Set status of invalidFlag to 1 to indicate invalid input
+bigNum:
+	mov		ebx, [ebp+40]
+	mov		eax, 1
+	mov		[ebx], eax
+
+noCarry:
 ; Reset stack frame
 	pop		ebp
 	popad
 	ret		20
 charToNum	ENDP
+
+; Description: Procedure to display a value
+; Receives: value to be displayed, @ string
+; Returns: none
+; Preconditions: none
+; Registers changed: none
+
+WriteVal	PROC
+; Set up stack frame
+	pushad
+	push			ebp
+	mov				ebp, esp
+
+; Set up storage location of string
+	mov				edi, [ebp+48]			; Access storage location of initial string to be generated
+
+; Convert numeric value
+	mov				ecx, 0					; Track number of digits
+	mov				ebx, [ebp+52]			; Access value to be converted
+loopString:
+	mov				edx, 0
+	mov				eax, ebx				; Set up dividend
+	mov				ebx, 10					; Set up divisor
+	div				ebx						; Perform division
+	mov				ebx, eax				; Save new quotient
+	mov				esi, [ebp+44]			; Access temp variable
+	add				edx, 48					; Convert remainder to ASCII val
+	mov				[esi], edx				; Save remainder in temp variable
+	mov				al, BYTE PTR [esi]		; Prepare to store byte
+	stosb									; Store converted byte
+	inc				ecx						; Track number of digits
+	cmp				ebx, 0					; Check if converted all digits
+	je				endString
+	jmp				loopString
+
+endString:
+	push			ecx
+; Clear userString
+	mov				edi, [ebp+40]
+	mov				ecx, STRING_SIZE
+	mov				al, 0
+	cld
+	rep				stosb
+	pop				ecx
+; Reverse string
+	mov				esi, [ebp+48]			; Access generated string
+	add				esi, ecx				; Move pointer to 1 byte past end of string
+	dec				esi						; Access last byte of string
+	mov				edi, [ebp+40]			; Access userString var to store final result
+reverse:
+	std										; Load string backwards
+	lodsb
+	cld										; Store string forwards
+	stosb							
+	loop			reverse
+
+; Display the final converted string
+	displayString	[ebp+40]				; Pass final string by reference to macro
+
+; Reset stack frame
+	pop				ebp
+	popad
+	ret				16
+WriteVal	ENDP
+
+; Description: Procedure to fill an array
+; Receives: @ array, @ prompt, @ userString, @ string length, @ tempVar, @ userVal, @ invalidFlag
+; Returns: array filled with 10 valid unsigned integers
+; Preconditions: none
+; Registers changed: none
+
+FillArray	PROC
+; Set up stack frame
+	pushad
+	push			ebp
+	mov				ebp, esp
+	mov				edi, [ebp+64]		; Access start of array
+	cld									; Read array in forwards direction
+	mov				ecx, NUM_VALUES		; Set up loop counter
+filling:
+	push			[ebp+60]			; Pass promptText by reference
+	push			[ebp+56]			; Pass userString variable by reference
+	push			[ebp+52]			; Pass string length
+	push			[ebp+48]			; Pass tempVar
+	push			[ebp+44]			; Pass userVal
+	push			[ebp+40]			; Pass invalidFlag
+	call			ReadVal
+	mov				eax, 0
+	mov				ebx, [ebp+40]
+	cmp				[ebx], eax			; Check if ReadVal received invalid input
+	jne				badInput
+	mov				ebx, [ebp+44]		; Get address of user's numeric value
+	mov				eax, 0				; Clear register
+	mov				eax, [ebx]			; Get user's numeric value
+	stosd						; Store in array
+	jmp				nextVal
+badInput:
+	inc				ecx					; Make up for decrementing on bad input
+	displayString	[ebp+68]	; Display error text if bad input
+nextVal:
+	loop			filling
+
+; Reset stack frame
+	pop				ebp
+	popad
+	ret				32
+FillArray	ENDP
+
+; Description: Procedure to show contents of array
+; Receives: @ array text, @ array, @ tempString, @tempDword, @userString
+; Returns: none
+; Preconditions: none
+; Registers changed: none
+
+ShowArray	PROC
+; Set up stack frame
+	pushad
+	push			ebp
+	mov				ebp, esp
+
+; Set up WriteVal
+	call			Crlf
+	displayString	[ebp+60]
+	mov				esi, [ebp+52]		; Access array
+	cld									; Read array in forward direction
+	mov				ecx, NUM_VALUES		; Set up loop counter
+show:
+	lodsd
+	push			eax
+	push			[ebp+48]
+	push			[ebp+44]
+	push			[ebp+40]
+	call			WriteVal
+	cmp				ecx, 1				; Check if reached last number
+	je				noComma
+	displayString	[ebp+56]
+noComma:
+	loop			show
+
+; Reset stack frame
+	pop				ebp
+	popad
+	ret				24
+ShowArray	ENDP
+
+; Description: Procedure to calculate and display the sum of array contents
+; Receives: @ avtText, @ sumText, @ array, and parameters for WriteVal
+; Returns: none
+; Preconditions: none
+; Registers changed: none
+
+ShowSumAvg	PROC
+; Set up stack frame
+	pushad
+	push			ebp
+	mov				ebp, esp
+	call			Crlf
+	displayString	[ebp+56]			; Display text for sum
+	mov				esi, [ebp+52]		; Access array
+	cld									; Read array in forward direction
+	mov				ebx, 0				; Set up accumulator
+	mov				ecx, NUM_VALUES		; Set up loop counter
+sum:
+	lodsd								; Get next array element
+	add				ebx, eax			; Add array element
+	loop			sum
+
+; Set up WriteVal to display sum
+	push			ebx					; Push sum to be displayed
+	push			[ebp+40]			; Push tempString
+	push			[ebp+44]			; Push tempDword
+	push			[ebp+48]			; Push userString
+	call			WriteVal
+
+; Find average
+	call			Crlf
+	displayString	[ebp+60]			; Display text for average
+	mov				eax, ebx			; Set up dividend
+	mov				edx, 0		
+	mov				ebx, NUM_VALUES		; Set up divisor
+	div				ebx					; Perform division
+
+; Set up WriteVal to display average
+	push			eax					; Push average to be displayed
+	push			[ebp+40]			; Push tempString
+	push			[ebp+44]			; Push tempDword
+	push			[ebp+48]			; Push userString
+	call			WriteVal
+
+; Reset stack frame
+	pop				ebp
+	popad
+	ret				24
+ShowSumAvg	ENDP
 
 END main
