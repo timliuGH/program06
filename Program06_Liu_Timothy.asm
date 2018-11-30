@@ -20,9 +20,13 @@ INCLUDE Irvine32.inc
 ; Receives: Address of prompt and address of string variable
 ; Returns: String variable with user's input
 ; Preconditions: none
-; Registers changed: eax, ecx, edx
+; Registers changed: none
 
-getString MACRO prompt, input
+getString MACRO prompt, input, strLen
+	push	eax
+	push	ebx
+	push	ecx
+	push	edx
 	mov		eax, 0
 	mov		edx, prompt
 	call	WriteString
@@ -30,6 +34,12 @@ getString MACRO prompt, input
 	mov		ecx, SIZE_CATCH
 	dec		ecx
 	call	ReadString
+	mov		ebx, strLen		; Access stringLength variable
+	mov		[ebx], eax		; Store length of user input
+	pop		edx
+	pop		ecx
+	pop		ebx
+	pop		eax
 ENDM
 
 ; Description: Macro to display a string
@@ -46,7 +56,7 @@ displayString MACRO str
 ENDM
 
 NUM_VALUES = 10
-STRING_SIZE = 11
+STRING_SIZE = 11	; Allows up to 10 digits, leaving space for null terminator
 SIZE_CATCH = 99		; Captures user input greater than 10 digits so it can be discarded and not processed
 
 .data
@@ -75,7 +85,6 @@ farewellText	Byte	"Thanks for playing!", 0
 
 .code
 main PROC
-
 ; Introduce the program and programmer
 	push	OFFSET intro_1
 	push	OFFSET intro_2
@@ -161,17 +170,17 @@ ReadVal		PROC
 	mov			ebp, esp
 
 ; Get string from user
-	getString	[ebp+60], [ebp+56]
+	getString	[ebp+60], [ebp+56], [ebp+52]
 
 ; Check if user input was more than 10 digits
-	cmp			eax, STRING_SIZE
-	je			notNum
+	mov			ebx, [ebp+40]			; Access status flag
+	mov			eax, [ebp+52]			; Access stringLength variable
+	mov			edx, STRING_SIZE
+	cmp			[eax], edx
+	jge			notNum
 
 ; Set up conversion from char to int
-	mov			edx, [ebp+52]			; Access address of string length variable
-	mov			[edx], eax				; Store string length	
-	mov			ecx, eax				; Set up counter			
-	mov			ebx, [ebp+40]			; Store status flag
+	mov			ecx, [eax]				; Set up counter			
 	mov			esi, [ebp+56]			; Store input
 	mov			edi, [ebp+56]			; Store output
 	cld									; Read string in forward direction
@@ -186,11 +195,12 @@ counter:
 	loop		counter
 
 ; Set up conversion to numeric value
-	push		[ebp+56]	; Pass user input by reference
-	push		[edx]		; Pass length of input
-	push		[ebp+48]	; Pass tempVar value by reference
-	push		[ebp+44]	; Pass variable to hold user's numeric value by reference
-	push		ebx			; Pass status flag by reference
+	push		[ebp+56]				; Pass user input by reference
+	mov			edx, [ebp+52]			; Access length of input
+	push		[edx]					; Pass length of input
+	push		[ebp+48]				; Pass tempVar value by reference
+	push		[ebp+44]				; Pass variable to hold user's numeric value by reference
+	push		ebx						; Pass status flag by reference
 	call		charToNum
 	mov			eax, 1
 	cmp			[ebx], eax
@@ -199,12 +209,12 @@ counter:
 
 notNum:
 	mov			eax, 1
-	mov			[ebx], eax
+	mov			[ebx], eax				; Set status flag to 1 to indicate invalid input
 	jmp			invalidInput
 
 validInput:
 	mov			eax, 0
-	mov			[ebx], eax
+	mov			[ebx], eax				; Set status flag to 0 to indicate valid input
 
 invalidInput:
 ; Reset stack frame
@@ -358,11 +368,11 @@ filling:
 	mov				ebx, [ebp+44]		; Get address of user's numeric value
 	mov				eax, 0				; Clear register
 	mov				eax, [ebx]			; Get user's numeric value
-	stosd						; Store in array
+	stosd								; Store in array
 	jmp				nextVal
 badInput:
 	inc				ecx					; Make up for decrementing on bad input
-	displayString	[ebp+68]	; Display error text if bad input
+	displayString	[ebp+68]			; Display error text if bad input
 nextVal:
 	loop			filling
 
@@ -471,7 +481,7 @@ Farewell	PROC
 	mov				ebp, esp
 	call			Crlf
 	call			Crlf
-	displayString	[ebp+8]
+	displayString	[ebp+8]		; Display farewell text
 	call			Crlf
 
 ; Reset stack frame
