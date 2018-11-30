@@ -21,6 +21,7 @@ INCLUDE Irvine32.inc
 ; Returns: String variable with user's input
 ; Preconditions: none
 ; Registers changed: eax, ecx, edx
+
 getString MACRO prompt, input
 	mov		eax, 0
 	mov		edx, prompt
@@ -35,15 +36,18 @@ ENDM
 ; Receives: @ string to be displayed
 ; Returns: none
 ; Preconditions: none
-; Registers changed: edx
+; Registers changed: none
+
 displayString MACRO str
+	push	edx
 	mov		edx, str
 	call	WriteString
+	pop		edx
 ENDM
 
 NUM_VALUES = 10
 STRING_SIZE = 11
-SIZE_CATCH = 99
+SIZE_CATCH = 99		; Captures user input greater than 10 digits so it can be discarded and not processed
 
 .data
 intro_1			BYTE	"Low-level I/O Procedures by Timothy Liu", 0dh, 0ah, 0dh, 0ah, 0
@@ -67,6 +71,8 @@ arrayText		BYTE	"You entered the following valid numbers:", 0dh, 0ah, 0
 comma			BYTE	", ", 0
 sumText			BYTE	"The sum of these numbers is: ", 0						
 avgText			BYTE	"The average is: ", 0
+farewellText	Byte	"Thanks for playing!", 0
+
 .code
 main PROC
 
@@ -74,7 +80,7 @@ main PROC
 	push	OFFSET intro_1
 	push	OFFSET intro_2
 	push	OFFSET intro_3
-	call	introduction
+	call	Introduction
 
 ; Prompt user for inputs to fill array
 	push	OFFSET errorText
@@ -104,42 +110,10 @@ main PROC
 	push	OFFSET tempDword
 	push	OFFSET userString
 	call	ShowSumAvg
-	
-COMMENT !
-; Prompt the user for input
-	push	OFFSET promptText
-	push	OFFSET userString
-	push	OFFSET stringLength
-	push	OFFSET tempVar
-	push	OFFSET userVal
-	push	OFFSET invalidFlag
-	call	ReadVal
 
-	cmp		invalidFlag, 1
-	je		badInput
-	mov		edx, OFFSET goodString
-	call	WriteString
-	call	Crlf
-	mov		eax, userVal
-	call	WriteDec
-	call	Crlf
-; WriteVal PROC
-	push	eax
-	push	OFFSET tempString
-	push	OFFSET tempDword
-	push	OFFSET userString
-	call	WriteVal
-	jmp		goodInput
-
-badInput:
-	mov		edx, OFFSET badString
-	call	WriteString
-goodInput:
-!
-; Display valid inputs
-; Display sum of inputs
-; Display average of inputs
 ; Say farewell
+	push	OFFSET farewellText
+	call	Farewell
 
 	exit	; exit to operating system
 main ENDP
@@ -150,7 +124,7 @@ main ENDP
 ; Preconditions: none
 ; Registers changed: none
 
-introduction	PROC
+Introduction	PROC
 ; Set up stack frame
 	push	edx
 	push	ebp
@@ -172,7 +146,7 @@ introduction	PROC
 	pop		ebp
 	pop		edx
 	ret		12
-introduction	ENDP
+Introduction	ENDP
 
 ; Description: Procedure to get a value from the user
 ; Receives: @ prompt, @ userString variable, @ string length, @ tempVar, @ userVal variable, @ invalidFlag
@@ -484,5 +458,25 @@ sum:
 	popad
 	ret				24
 ShowSumAvg	ENDP
+
+; Description: Procedure to say farewell to user
+; Receives: @ farewellText
+; Returns: none
+; Preconditions: none
+; Registers changed: none
+
+Farewell	PROC
+; Set up stack frame
+	push			ebp
+	mov				ebp, esp
+	call			Crlf
+	call			Crlf
+	displayString	[ebp+8]
+	call			Crlf
+
+; Reset stack frame
+	pop				ebp
+	ret				4
+Farewell	ENDP
 
 END main
