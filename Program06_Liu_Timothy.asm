@@ -57,7 +57,7 @@ displayString MACRO str
 	pop		edx
 ENDM
 
-NUM_VALUES = 10
+NUM_VALUES = 10		; Size of array
 STRING_SIZE = 11	; Allows up to 10 digits, leaving space for null terminator
 SIZE_CATCH = 99		; Captures user input greater than 10 digits so it can be discarded and not processed
 
@@ -88,42 +88,42 @@ farewellText	Byte	"Thanks for playing!", 0
 .code
 main PROC
 ; Introduce the program and programmer
-	push	OFFSET intro_1
+	push	OFFSET intro_1				; Pass intro text by reference
 	push	OFFSET intro_2
 	push	OFFSET intro_3
 	call	Introduction
 
 ; Prompt user for inputs to fill array
-	push	OFFSET errorText
-	push	OFFSET array
-	push	OFFSET promptText
-	push	OFFSET userString
-	push	OFFSET stringLength
-	push	OFFSET tempVar
-	push	OFFSET userVal
-	push	OFFSET invalidFlag
+	push	OFFSET errorText			; Pass error message text
+	push	OFFSET array				; Pass address of array
+	push	OFFSET promptText			; Pass prompt to user
+	push	OFFSET userString			; Pass user's input
+	push	OFFSET stringLength			; Pass length of user's input
+	push	OFFSET tempVar				; Pass temporary variable used for converting from char to numeric
+	push	OFFSET userVal				; Holds user's numeric value converted from string input
+	push	OFFSET invalidFlag			; Holds status of user input and string conversion
 	call	FillArray
 
 ; Display integers stored in array
-	push	OFFSET arrayText
-	push	OFFSET comma
-	push	OFFSET array
-	push	OFFSET tempString
-	push	OFFSET tempDword
-	push	OFFSET userString
+	push	OFFSET arrayText			; Pass text introducing array of ints
+	push	OFFSET comma				; Pass comma used to display ints
+	push	OFFSET array				; Pass address of array
+	push	OFFSET tempString			; Pass temporary string used for converting from numeric to char
+	push	OFFSET tempDword			; Pass temporary DWORD variable to help with conversion
+	push	OFFSET userString			; Pass user input
 	call	ShowArray
 
 ; Calculate and display sum and average
-	push	OFFSET avgText
-	push	OFFSET sumText
-	push	OFFSET array
-	push	OFFSET tempString
-	push	OFFSET tempDword
-	push	OFFSET userString
+	push	OFFSET avgText				; Pass text introducing the average
+	push	OFFSET sumText				; Pass text introducing the sum
+	push	OFFSET array				; Pass address of array
+	push	OFFSET tempString			; Pass temporary string used for converting from numeric to char
+	push	OFFSET tempDword			; Pass temporary DWORD variable to help with conversion
+	push	OFFSET userString			; Pass user input
 	call	ShowSumAvg
 
 ; Say farewell
-	push	OFFSET farewellText
+	push	OFFSET farewellText			; Pass farewell text
 	call	Farewell
 
 	exit	; exit to operating system
@@ -137,25 +137,20 @@ main ENDP
 
 Introduction	PROC
 ; Set up stack frame
-	push	edx
 	push	ebp
 	mov		ebp, esp
 	
 ; Display program's title and programmer's name
-	mov		edx, [ebp+20]
-	call	WriteString
+	displayString	[ebp+16]
 
 ; Display program instructions
-	mov		edx, [ebp+16]
-	call	WriteString
+	displayString	[ebp+12]
 
 ; Display program description
-	mov		edx, [ebp+12]
-	call	WriteString
+	displayString	[ebp+8]
 
 ; Reset stack frame
 	pop		ebp
-	pop		edx
 	ret		12
 Introduction	ENDP
 
@@ -182,18 +177,18 @@ ReadVal		PROC
 	jge			notNum
 
 ; Set up conversion from char to int
-	mov			ecx, [eax]				; Set up counter			
+	mov			ecx, [eax]				; Set up counter						
 	mov			esi, [ebp+56]			; Store input
 	mov			edi, [ebp+56]			; Store output
 	cld									; Read string in forward direction
 counter:
-	lodsb
+	lodsb								; Load first digit
 	cmp			al, 48					; Check lower range of value
 	jl			notNum				
 	cmp			al, 57					; Check upper range of value
 	jg			notNum
 	sub			al, 48					; Convert to int value
-	stosb
+	stosb								; Store converted digit
 	loop		counter
 
 ; Set up conversion to numeric value
@@ -205,7 +200,7 @@ counter:
 	push		ebx						; Pass status flag by reference
 	call		charToNum
 	mov			eax, 1
-	cmp			[ebx], eax
+	cmp			[ebx], eax				; Check if conversion procedure failed due to invalid input
 	je			invalidInput
 	jmp			validInput
 
