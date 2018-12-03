@@ -1,13 +1,13 @@
 TITLE Low-level I/O Procedures     (Program06_Liu_Timothy.asm)
 
 ; Author: Timothy Liu
-; Last Modified: November 28, 2018
+; Last Modified: December 2, 2018
 ; OSU email address: liutim@oregonstate.edu
 ; Course number/section: CS_271_400_F2018
 ; Project Number: 06               Due Date: December 2, 2018
 ; Description: This program implements ReadVal and WriteVal procedures
 ;   for unsigned integers and uses getString and displayString macros.
-;	The program will prompt the user for a value, validate the input,
+;	A test program will prompt the user for 10 values, validate the inputs,
 ;	display all valid inputs, calculate and display the sum, and calculate
 ;	and display the average.
 
@@ -18,24 +18,26 @@ INCLUDE Irvine32.inc
 
 ; Description: Macro to get a string from the user
 ; Receives: Address of prompt and address of string variable
-; Returns: String variable with user's input
+; Returns: String variable with user's input and user's input length
 ; Preconditions: none
 ; Registers changed: none
 
 getString MACRO prompt, input, strLen
+; Save registers
 	push	eax
 	push	ebx
 	push	ecx
 	push	edx
-	mov		eax, 0
 	mov		edx, prompt
-	call	WriteString
-	mov		edx, input
+	call	WriteString		; Prompt user for input
+	mov		edx, input		; Get input location
 	mov		ecx, SIZE_CATCH
-	dec		ecx
-	call	ReadString
+	dec		ecx				
+	call	ReadString		; Get input from user
 	mov		ebx, strLen		; Access stringLength variable
 	mov		[ebx], eax		; Store length of user input
+
+; Restore registers
 	pop		edx
 	pop		ecx
 	pop		ebx
