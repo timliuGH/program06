@@ -2,9 +2,6 @@ TITLE Low-level I/O Procedures     (Program06_Liu_Timothy.asm)
 
 ; Author: Timothy Liu
 ; Last Modified: December 2, 2018
-; OSU email address: liutim@oregonstate.edu
-; Course number/section: CS_271_400_F2018
-; Project Number: 06               Due Date: December 2, 2018
 ; Description: This program implements ReadVal and WriteVal procedures
 ;   for unsigned integers and uses getString and displayString macros.
 ;	A test program will prompt the user for 10 values, validate the inputs,
